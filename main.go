@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"thread_pool_study/config"
 	"thread_pool_study/jobwithstate"
 	"thread_pool_study/workerpool"
@@ -10,70 +11,72 @@ import (
 	"github.com/zenthangplus/goccm"
 )
 
-func plane(done chan int) int {
+func plane() int64 {
 	j := jobwithstate.New()
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
-	for i := 0; i < int(config.ThreadCount)*100; i++ {
-		go j.Do()
+	wg.Add(int(config.ThreadCount) * config.Iterations)
+	for i := 0; i < int(config.ThreadCount)*config.Iterations; i++ {
+		go func() {
+			j.Do(&mu)
+			wg.Done()
+		}()
 	}
 
-	done <- 1
+	wg.Wait()
 
 	return j.State
 }
 
-func workerPool(done chan int) int {
-	wp := workerpool.New(config.ThreadCount)
+func workerPool() int64 {
+	wp := workerpool.New(config.ThreadCount * 2)
 	j := jobwithstate.New()
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
-	for i := 0; i < int(config.ThreadCount)*100; i++ {
-		wp.DoWork(j.Do)
+	wg.Add(int(config.ThreadCount) * config.Iterations)
+	for i := 0; i < int(config.ThreadCount)*config.Iterations; i++ {
+		wp.DoWork(j.Do, &wg, &mu)
 	}
-
-	done <- 1
+	wg.Wait()
 
 	return j.State
 }
 
-func goccMan() int {
+func goccMan() int64 {
 	ccm := goccm.New(int(config.ThreadCount))
 	j := jobwithstate.New()
+	var mu sync.Mutex
 
-	for i := 0; i < int(config.ThreadCount*100); i++ {
+	for i := 0; i < int(config.ThreadCount)*config.Iterations; i++ {
 		ccm.Wait()
-		go func(index int) {
-			j.Do()
+		go func() {
+			j.Do(&mu)
 			ccm.Done()
-		}(i)
+		}()
 	}
 	ccm.WaitAllDone()
 
 	return j.State
 }
 
+func measureExecTime(f func() int64) {
+	start := time.Now()
+	res := f()
+	elapsed := time.Since(start)
+	fmt.Printf("finished in %d micro-seconds\n", elapsed.Microseconds())
+	fmt.Printf("result: %d\n", res)
+}
+
 func main() {
 
-	done := make(chan int, 1)
-	start := time.Now()
-	res := workerPool(done)
-	<-done
-	elapsed := time.Since(start)
+	// fmt.Println("\nplane")
+	// measureExecTime(plane)
+
 	fmt.Println("\nthreadpool")
-	fmt.Printf("finished in %d micro-seconds\n", elapsed.Microseconds())
-	fmt.Printf("result: %d\n", res)
+	measureExecTime(workerPool)
 
-	start = time.Now()
-	res = plane(done)
-	<-done
-	elapsed = time.Since(start)
-	fmt.Println("\nplane")
-	fmt.Printf("finished in %d micro-seconds\n", elapsed.Microseconds())
-	fmt.Printf("result: %d\n", res)
-
-	start = time.Now()
-	res = goccMan()
-	elapsed = time.Since(start)
-	fmt.Println("\ngoccm")
-	fmt.Printf("completed in %dmcs\n", elapsed.Microseconds())
-	fmt.Printf("result %d\n", res)
+	// fmt.Println("\ngoccm")
+	// measureExecTime(goccMan)
 }

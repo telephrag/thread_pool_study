@@ -8,36 +8,31 @@ import (
 	"math/rand"
 	"runtime"
 	"sync"
+	"sync/atomic"
 )
 
 type Job struct {
-	State int
+	State int64
 }
 
 func New() *Job {
 	return &Job{
-		State: math.MaxInt,
+		State: math.MaxInt64,
 	}
 }
 
-func (j *Job) Do() {
+func (j *Job) Do(mu *sync.Mutex) {
 
-	val := rand.Int() % 10000
-	ng := runtime.NumGoroutine()
+	val := rand.Int63() % 10000
+	ng := int64(runtime.NumGoroutine())
+
 	work := md5.Sum([]byte(fmt.Sprint(ng + val))) // h(h(m) || m)
 	work = md5.Sum([]byte(fmt.Sprint(work, ng+val)))
-	val = int(binary.BigEndian.Uint16(work[:2])) % 10000
 
-	// fmt.Printf("goroutines exist: %d; work: %v\n", ng, work)
-	// is time.Sleep() bad representation of work being done?
-	// consider using hash-function calculation instead -> apparently func requesres implementation
-	// time.Sleep(time.Millisecond * 2000)
+	val = int64(binary.BigEndian.Uint16(work[:2])) % 10000
 
-	//fmt.Printf("val: %d\n", val)
-	if val < j.State {
-		var mu sync.Mutex
-		mu.Lock()
-		defer mu.Unlock()
-		j.State = val
+	swapped := atomic.CompareAndSwapInt64(&(j.State), j.State, val)
+	if swapped {
+		fmt.Printf("new state: %d\n", j.State)
 	}
 }
