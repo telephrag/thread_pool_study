@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"runtime"
 	"sync"
-	"sync/atomic"
 )
 
 type Job struct {
@@ -31,8 +30,10 @@ func (j *Job) Do(mu *sync.Mutex) {
 
 	val = int64(binary.BigEndian.Uint16(work[:2])) % 10000
 
-	swapped := atomic.CompareAndSwapInt64(&(j.State), j.State, val)
-	if swapped {
-		fmt.Printf("new state: %d\n", j.State)
+	mu.Lock()
+	defer mu.Unlock()
+	if val < j.State {
+		fmt.Printf("swap: %d, %d\n", val, j.State)
+		j.State = val
 	}
 }

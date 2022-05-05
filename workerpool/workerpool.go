@@ -12,7 +12,7 @@ func New(threadCount uint64) *WorkerPool { // TODO: Handle error when threadCoun
 	}
 }
 
-func (wp *WorkerPool) DoWork(work func(*sync.Mutex), wg *sync.WaitGroup, mu *sync.Mutex) { // TODO: Add case check wether worker pool has finished
+func (wp *WorkerPool) DoWork(work func(*sync.Mutex), wg *sync.WaitGroup, mu *sync.Mutex) { // TODO: Asser weather worker pool has finished
 	wp.RunningJobs <- 1
 	go func() {
 		work(mu)
