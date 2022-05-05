@@ -1,9 +1,12 @@
 package workerpool
 
-import "sync"
+import (
+	"sync"
+)
 
 type WorkerPool struct {
 	RunningJobs chan rune
+	Wg          sync.WaitGroup
 }
 
 func New(threadCount uint64) *WorkerPool { // TODO: Handle error when threadCount = 0
@@ -12,11 +15,22 @@ func New(threadCount uint64) *WorkerPool { // TODO: Handle error when threadCoun
 	}
 }
 
-func (wp *WorkerPool) DoWork(work func(*sync.Mutex), wg *sync.WaitGroup, mu *sync.Mutex) { // TODO: Asser weather worker pool has finished
+func (wp *WorkerPool) DoWork(work func()) { // TODO: Asser weather worker pool has finished
 	wp.RunningJobs <- 1
+	wp.Wg.Add(1)
 	go func() {
-		work(mu)
+		work()
 		<-wp.RunningJobs // free the slot for another job
-		wg.Done()        // TODO: Move WaitGroup inside the WorkerPool struct
+		wp.Wg.Done()
 	}()
+}
+
+func (wp *WorkerPool) Await() { // TODO: Add wait timeout. Make it dynamically wait for tasks.
+	if len(wp.RunningJobs) > 0 {
+		wp.Wg.Wait()
+	}
+}
+
+func (wp *WorkerPool) Resume() {
+	wp.Wg.Done() // TODO
 }

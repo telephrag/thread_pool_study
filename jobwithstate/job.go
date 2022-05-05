@@ -12,6 +12,7 @@ import (
 
 type Job struct {
 	State int64
+	Mu    sync.Mutex
 }
 
 func New() *Job {
@@ -20,7 +21,7 @@ func New() *Job {
 	}
 }
 
-func (j *Job) Do(mu *sync.Mutex) {
+func (j *Job) Do() {
 
 	val := rand.Int63() % 10000
 	ng := int64(runtime.NumGoroutine())
@@ -30,10 +31,10 @@ func (j *Job) Do(mu *sync.Mutex) {
 
 	val = int64(binary.BigEndian.Uint16(work[:2])) % 10000
 
-	mu.Lock()
-	defer mu.Unlock()
+	j.Mu.Lock()
+	defer j.Mu.Unlock()
 	if val < j.State {
-		fmt.Printf("swap: %d, %d\n", val, j.State)
+		//fmt.Printf("swap: %d, %d\n", val, j.State)
 		j.State = val
 	}
 }

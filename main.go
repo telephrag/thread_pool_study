@@ -13,17 +13,15 @@ import (
 
 func plane() int64 {
 	j := jobwithstate.New()
-	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	wg.Add(int(config.ThreadCount) * config.Iterations)
 	for i := 0; i < int(config.ThreadCount)*config.Iterations; i++ {
 		go func() {
-			j.Do(&mu)
+			j.Do()
 			wg.Done()
 		}()
 	}
-
 	wg.Wait()
 
 	return j.State
@@ -32,14 +30,11 @@ func plane() int64 {
 func workerPool() int64 {
 	wp := workerpool.New(config.ThreadCount * 2)
 	j := jobwithstate.New()
-	var mu sync.Mutex
-	var wg sync.WaitGroup
 
-	wg.Add(int(config.ThreadCount) * config.Iterations)
 	for i := 0; i < int(config.ThreadCount)*config.Iterations; i++ {
-		wp.DoWork(j.Do, &wg, &mu)
+		wp.DoWork(j.Do)
 	}
-	wg.Wait()
+	wp.Await()
 
 	return j.State
 }
@@ -47,12 +42,11 @@ func workerPool() int64 {
 func goccMan() int64 {
 	ccm := goccm.New(int(config.ThreadCount))
 	j := jobwithstate.New()
-	var mu sync.Mutex
 
 	for i := 0; i < int(config.ThreadCount)*config.Iterations; i++ {
 		ccm.Wait()
 		go func() {
-			j.Do(&mu)
+			j.Do()
 			ccm.Done()
 		}()
 	}
@@ -65,18 +59,17 @@ func measureExecTime(f func() int64) {
 	start := time.Now()
 	res := f()
 	elapsed := time.Since(start)
-	fmt.Printf("finished in %d micro-seconds\n", elapsed.Microseconds())
+	fmt.Printf("finished in %d us\n", elapsed.Microseconds())
 	fmt.Printf("result: %d\n", res)
 }
 
 func main() {
+	fmt.Println("\nplane")
+	measureExecTime(plane)
 
-	// fmt.Println("\nplane")
-	// measureExecTime(plane)
-
-	fmt.Println("\nthreadpool")
+	fmt.Println("\nworkerpool")
 	measureExecTime(workerPool)
 
-	// fmt.Println("\ngoccm")
-	// measureExecTime(goccMan)
+	fmt.Println("\ngoccm")
+	measureExecTime(goccMan)
 }
